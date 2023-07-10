@@ -3,17 +3,14 @@ from django.http import HttpResponse, JsonResponse
 import cv2
 import numpy as np
 import math
-import country_codes
 from django.http import StreamingHttpResponse
+from django.contrib.auth.models import User
+from app.models import register, company_register
 # Create your views here.
 
 
 def home(request):
-    phone = country_codes.phone_codes()
-    codes = []
-    for i in phone:
-        codes.append(i["name"]+i["dial_code"])
-    return render(request, "home.html",{'codes':codes})
+    return render(request, "home.html")
 
 
 
@@ -85,6 +82,8 @@ def train(request):
 
     # Convert the list of face encodings to a numpy array
     face_encodings = np.concatenate(face_encodings)
+    data = str(face_encoding.tolist())
+    print("lenght :",len(data))
 
     # Train a model using the face encodings
     # Add code to train the model here
@@ -96,4 +95,60 @@ def train(request):
     cap.release()
     cv2.destroyAllWindows()
 
-    return HttpResponse(face_encodings)
+    return HttpResponse(data)
+
+
+
+def check_company(request):
+    if request.method == "GET":
+        name = request.GET['user']
+        user = company_register.objects.filter(company_name=name)
+        if user:
+            print("exists")
+            data = "exists"
+        else:
+            print("notexists")
+            data = "notexists"
+            
+    else:
+        return HttpResponseRedirect("/")
+    return HttpResponse(data)
+
+
+def user_register(request):
+    if request.method == "GET":
+        name = request.GET['name']
+        p_code = request.GET['p_code']
+        number = request.GET['number']
+        company = request.GET['company']
+        face_encodings = request.GET['face_encodings']
+        
+        user = User.objects.create_user(name)
+        user.save()
+        
+        user_register = register(name=user,username=name,p_code=p_code,number=number,company=company,face_encodings=face_encodings)
+        user_register.save()
+    else:
+        return HttpResponseRedirect("/")
+    return HttpResponse("Success")
+
+def company(request):
+    if request.method == "POST":
+        c_name = request.POST['c_name']
+        m_name = request.POST['m_name']
+        location = request.POST['location']
+        print(c_name)
+        data = company_register(company_name=c_name, manager_name=m_name, company_location=location)
+        data.save()
+    else:
+        return HttpResponseRedirect("/")
+    return render(request,'home.html',{'status':'Successfully Registered'})
+
+
+def company_api(request):
+    data = company_register.objects.all().values()
+    return JsonResponse(list(data),safe=False)
+
+def app_api(request):
+    data = register.objects.all().values()
+    return JsonResponse(list(data),safe=False)
